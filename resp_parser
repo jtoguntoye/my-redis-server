@@ -1,0 +1,48 @@
+def resp_parser(data):
+    print('resp parser execution started')
+    '''
+    The RESP parser will ensure the RESP frame received is complete before being processed.
+    Returns 2 variables: 1)complete list of args for a RESP frame sent and 2) any leftover frame
+    '''
+    if not data.startswith(b'*'):
+       raise ValueError("Invalid RESP frame: must start with '*'")
+    
+    
+    #split the received frame into a list and remove trailing empty string
+    lines = data.split(b'\r\n')
+    if lines and lines[-1]==b'':
+           lines = lines[:-1]
+    print(lines)
+    
+    #at least 3 elements must be present in the list holding the RESP frame if it has one argument
+    if len(lines) < 3:
+       raise ValueError("Incomplete RESP frame")
+    
+    #Get the number of arguments from the first element in 'lines' list
+    arg_count_line = lines[0]
+    try:
+        arg_count = int(arg_count_line[1:]) #skip the '*'
+        print(f'arg_count is {arg_count}')
+    except:
+        raise ValueError("Invalid argument count")
+    
+    actual_lines = lines[1:]
+    #use 'arg_count' to determine if the RESP frame is received completely. 
+    num_expected_args = arg_count * 2 
+    if len(actual_lines) < num_expected_args:
+       raise ValueError("Incomplete RESP frame, wait for more data ...")
+   
+    args = []
+    i = 0
+    while i < num_expected_args:
+        data_line = actual_lines[i+1]
+        args.append(data_line)
+        i+=2
+        
+    #if length of the buffer received is greater than expected length, then we may have received additional frames
+    complete_frame_parsed = b"\r\n".join(actual_lines[:num_expected_args]) + b"\r\n"
+    # leftover_frame= b""
+    # if(len(lines) > len(complete_frame_parsed) ):
+    leftover_frame = b"\r\n".join(data[len(complete_frame_parsed):]) + b"\r\n" # ERROR LINE FIXED 
+    print(args)
+    return args, leftover_frame
