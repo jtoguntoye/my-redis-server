@@ -1,2 +1,3 @@
 debug.log
-pycache/*
+__pycache__/
+*.py[cod]
