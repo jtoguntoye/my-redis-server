@@ -1,7 +1,7 @@
 #The primary data store for the redis server instance. A basic dictionary.
 #Redis is basically a key-value store. everything in redis is stored under a key.
 #
-my_primary_store = {b'Game Top Score': b'1500', b'Top scorer': b'Ade'}
+my_primary_store = {b'Game Top Score': '1500é'.encode('utf-8'), b'Top scorer': b'Ade'}
 
 def execute_commands(args) -> bytes:
     '''
@@ -38,16 +38,18 @@ def execute_commands(args) -> bytes:
             
         
     elif command_to_execute == b'GET':
-        #will return the value for the key specified in the GET command received
+        #will return the value for the key specified in the GET command received formatted with RESP rules
+        #'$<bytelengthofvalue\r\n<actualvalue>\r\n'
         # for a valid RESP string we expect one argument for a Redis GET command
         #the key of the value we want to get(plus the GET command itself means expected length of args is 2)
+        
         if len(args) == 2:
             print("The dictionary storing the redis server data:", my_primary_store)
             print
             if my_primary_store.get(args[1])!= None:
-               return my_primary_store[args[1]]
+               return b"$%d\r\n%s\r\n" % (len(my_primary_store[args[1]]), my_primary_store[args[1]])
             else:
-                return b"The key specified does not exist\r\n"
+                return b" $-1\r\n The key specified does not exist\r\n"
         else:
           return b"-Err, Invalid argument count! please specify only the GET Command and one key to get\r\n"
       
