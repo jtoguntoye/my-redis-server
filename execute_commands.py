@@ -3,6 +3,7 @@
 #
 my_primary_store = {b'Game Top Score': '1500é'.encode('utf-8'), b'Top scorer': b'Ade'}
 
+#the execute_commands function is the main function to handle 
 def execute_commands(args) -> bytes:
     '''
     params:
@@ -55,8 +56,7 @@ def execute_commands(args) -> bytes:
       
     elif command_to_execute == b'DEL':
         ''' will delete the value(s) for the key(s) passed as argument to the DEL command
-            and return the number of keys removed
-        '''            
+            and return the number of keys deleted''' 
         deleted = 0
         if len(args) < 2:
             return  b'-ERR Wrong number of arguments. specify at least one key to delete in the redis store'

@@ -44,7 +44,7 @@ def send_message():
             while msgbytes_sent_so_far < len(msg):
                _, write, _ = select.select([],[sock],[], 5)
                if not write:
-                   raise TimeoutError("Server buffer is full")     
+                   raise TimeoutError("Server buffer is full. Send operation timed out")     
                
                try:
                 byte_send = sock.send(msg[msgbytes_sent_so_far:]) #send message to the OS buffer, returns int value of number of bytes successfully queued to the os send buffer
@@ -66,19 +66,55 @@ def send_message():
                      break
                  response += chunk
                  
-                 #--TODO implement check if response is complete(e.g ends with \r\n)
-                 #This logic depends on the specific redis command result type.
-                 # if is_resp_complete(response):
-                 print("Response:", response.decode('utf-8'))
-                 break
+                 if is_resp_complete(response):
+                     print("Response:", response.decode('utf-8'))
+                     break
               except BlockingIOError:
                 continue
             
 
-send_message()
+def is_resp_complete(response):
+    """
+    Helper function to check if the RESP response is complete.
+    For GET commands, the response is a bulk string:
+    - If found: $<length>\r\n<data>\r\n
+    - If not found: $-1\r\n
+    """
+    if not response:
+        return False
+    
+    # Must end with \r\n for a complete RESP message
+    if not response.endswith(b'\r\n'):
+        return False
+    
+    # Check for null bulk string response
+    if response == b'$-1\r\n':
+        return True
+    
+    # Parse bulk string response
+    if response.startswith(b'$'):
+        try:
+            # Find the first \r\n to get the length line
+            first_crlf = response.find(b'\r\n')
+            if first_crlf == -1:
+                return False
+            
+            # Extract and parse the length
+            length_str = response[1:first_crlf].decode('utf-8')
+            length = int(length_str)
+            
+            # The data starts after the first \r\n
+            data_start = first_crlf + 2
+            expected_end = data_start + length + 2  # +2 for the trailing \r\n
+            
+            # Check if we have received all the expected bytes
+            return len(response) >= expected_end
+        except (ValueError, UnicodeDecodeError):
+            return False
+    
+    return False
 
-#--TODO ---
-#def is_resp_complete(response):
-#Helper function to check if the response received is complete depending on the type of redis command sent
+
+send_message()
 
 
