@@ -68,7 +68,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
    print("waiting for incoming connection")
    conn_sock, addr = listening_socket.accept()
    print(f"new connection accepted: connection socket is {conn_sock}")
-   print(f"connected by:{addr}")
+   print(f"server accepted connection  to :{addr}")
    buffer = b""
   
    #while the incoming connection is opened, get data sent from client and store in a buffer. process the message sent

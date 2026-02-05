@@ -3,33 +3,33 @@ import sys
 import select
 import errno
 
-def send_message():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setblocking(False)
-    with sock:
-        try:
+#create global client connection socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setblocking(False)
+
+def connect():
+    try:
            sock.connect(('localhost', 6379))
-        except BlockingIOError:
-           #connection in progress
-           pass
+    except BlockingIOError:
+        #connection in progress
+        pass
         
-        #wait for the TCP handshake to complete
-        _, writable, _ = select.select([],[sock],[],5) #select returns three lists: readable, writable and errored sockets
+    #wait for the TCP handshake to complete
+    _, writable, _ = select.select([],[sock],[],5) #select returns three lists: readable, writable and errored sockets
         
-        if sock not in writable:
-               raise TimeoutError("Server connection timeout. Seems no redis server is up")  
+    if sock not in writable:
+        raise TimeoutError("Server connection timeout. Seems no redis server is up")  
                
-        else:  
+    else:  
            #the TCP handshake attempt has been completed, we can now work with the socket. 
            # First, we check if the NONBLOCKING connect we initiated succeeded
            err = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
-           if err != 0:
-                raise OSError(err, errno.errorcode.get(err, "Unknown error"))  
-            
-           else:
-               #err==0
-               #connection successful
-               #build RESP frame
+    if err != 0:
+                raise OSError(err, errno.errorcode.get(err, "Unknown error"))
+               
+def send_message():
+    
+            #build RESP frame
             msg = (f"*2\r\n"
                   f"$3\r\n"
                   f"GET\r\n"
@@ -38,8 +38,7 @@ def send_message():
                   ).encode('utf-8')
             print("length of encoded string to send:",len(msg))
             
-            #---- sending message --------
-           
+            #---- sending message --------           
             msgbytes_sent_so_far = 0
             while msgbytes_sent_so_far < len(msg):
                _, write, _ = select.select([],[sock],[], 5)
@@ -52,11 +51,11 @@ def send_message():
                except BlockingIOError:
                  continue
               
-
+def receive_response():
          #----- receiving -------
            response = b""
            while True:
-             # wait for data to arrive from the network (Readable)
+             # wait for data to arrive from the network (watch the list of Readable sockets )
               readable, _, _ = select.select([sock],[],[], 5)
               if not readable:
                  raise TimeoutError("Receive timeout: No data from Redis server")     
@@ -91,6 +90,10 @@ def is_resp_complete(response):
     if response == b'$-1\r\n':
         return True
     
+    #check for response of SET command (success "+OK\r\n\")
+    if response == b'+OK\r\n':
+        return True
+    
     # Parse bulk string response
     if response.startswith(b'$'):
         try:
@@ -110,11 +113,16 @@ def is_resp_complete(response):
             # Check if we have received all the expected bytes
             return len(response) >= expected_end
         except (ValueError, UnicodeDecodeError):
-            return False
+            return False    
     
     return False
 
+def close_connection():
+    sock.close()
 
+connect()
 send_message()
+receive_response()
+close_connection()
 
 
