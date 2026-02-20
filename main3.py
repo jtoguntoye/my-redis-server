@@ -1,9 +1,23 @@
 import socket
+import select
 import execute_commands
+import errno
 
 HOST = ''
 PORT = 6379
 
+#dictionary to store clients #sockets -> read_buffer
+clients = {}
+
+#create global listening socket and connection sockets
+listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+#reuse the port immediately after connection is closed
+listening_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+
+#Bind the listening socket to host and port
+listening_socket.bind((HOST, PORT))
+listening_socket.listen(2)
 
 def resp_parser(data):
     '''
@@ -54,53 +68,59 @@ def resp_parser(data):
     return args, leftover_frame
  
 
-#create a socket
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
-
-#reuse the port immediately after connection is closed
-   listening_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-   #Bind the listening socket to host and port
-   listening_socket.bind((HOST, PORT))
-   listening_socket.listen(2)
-
-   #accept client connection 
-   print("waiting for incoming connection")
-   conn_sock, addr = listening_socket.accept()
-   print(f"new connection accepted: connection socket is {conn_sock}")
-   print(f"server accepted connection  to :{addr}")
-   buffer = b""
-  
-   #while the incoming connection is opened, get data sent from client and store in a buffer. process the message sent
-   with conn_sock:
-     while True:
-       try: 
-          data = conn_sock.recv(1024)
-          if not data:
-            print("client disconnected!")
-            break
-          buffer +=data
-          print(f"received data so far: {buffer.decode().strip().upper()}")
-        
-          try:
-            print('executing the resp parser now') 
-            resp_args, leftover = resp_parser(buffer)
-            print(resp_args)
-            if leftover: 
-              print('leftover:',leftover)
-            
-          except Exception as e:
-            print(f"parsing Error: {e}")
-            continue
     
-        #handle message received 
-          value_to_send = execute_commands.execute_commands(resp_args)
-          conn_sock.sendall(value_to_send)
-        #set buffer to any leftover arg from latest parsed frame after getting all of the last received command
-          buffer = leftover
-              
-       except Exception as ex:
-         print(f"Exception: {ex}")
-         print("Client disconnected. Connection ended abruptly")
-         break
+    #not needed.calling accept() means handshake already succeeded
+    #wait for the TCP handshake with a client to complete
+    #readable, _, _ = select.select([conn_sock], [],[], 5)
+
+
+def connect_receive_and_process_data_from_client():
+    while True:
+       # wait for data to arrive from the network (watch the list of Readable sockets )
+       readable, _, _ = select.select([listening_socket]+ list(clients.keys()),[],[])
+       
+       for sock in readable:
+           if sock is listening_socket:
+             listening_socket.setblocking(False)
+               #we have a new connection
+             connx, addr = listening_socket.accept()
+             connx.setblocking(False)
+             clients[connx] = b""
+
+           else:
+               #i.e we have an existing connection from a client
+             data = sock.recv(1024)
+             
+             if not data:
+                 #client disconnected
+                sock.close()
+                del clients[sock]
+                continue
+                    
+             clients[sock] += data 
+             
+             while True:
+                print('executing the resp parser now') 
+                try:
+                   resp_args, leftover = resp_parser(clients[sock])
+                   print(resp_args)
+                   clients[sock] = leftover
+                
+                #call resp executor
+                   value_to_send = execute_commands.execute_commands(resp_args)
+                   sock.sendall(value_to_send)
             
+                except ValueError:
+                  print(f"parsing Error")
+                  break
+
+try:
+    connect_receive_and_process_data_from_client()
+
+except KeyboardInterrupt:
+    print("\nShutting down server")
+
+finally:
+    listening_socket.close()
+    for sock in list(clients.keys()):
+        sock.close()
