@@ -68,7 +68,7 @@ def receive_response():
                  if is_resp_complete(response):
                      print("Response:", response.decode('utf-8'))
                      break
-              except BlockingIOError:
+              except Exception:
                 continue
             
 

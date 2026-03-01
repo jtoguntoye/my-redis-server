@@ -11,6 +11,7 @@ clients = {}
 
 #create global listening socket and connection sockets
 listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+listening_socket.setblocking(False)
 
 #reuse the port immediately after connection is closed
 listening_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
@@ -73,15 +74,33 @@ def resp_parser(data):
     #wait for the TCP handshake with a client to complete
     #readable, _, _ = select.select([conn_sock], [],[], 5)
 
+def process_client_buffer(sock):
+             buffer = clients[sock]    
+             while buffer:
+                print('executing the resp parser now') 
+                try:
+                   resp_args, leftover = resp_parser(buffer)
+                   print(resp_args)
+                   buffer = leftover
+                   value_to_send = execute_commands.execute_commands(resp_args)
+                   sock.sendall(value_to_send)
+                   
+                except ValueError:
+                  #incomplete frame
+                  break
+             clients[sock] = buffer
+             
 
 def connect_receive_and_process_data_from_client():
     while True:
        # wait for data to arrive from the network (watch the list of Readable sockets )
+       print("Entering select")
        readable, _, _ = select.select([listening_socket]+ list(clients.keys()),[],[])
+       print("Select returned")
        
        for sock in readable:
            if sock is listening_socket:
-             listening_socket.setblocking(False)
+             
                #we have a new connection
              connx, addr = listening_socket.accept()
              connx.setblocking(False)
@@ -96,23 +115,8 @@ def connect_receive_and_process_data_from_client():
                 sock.close()
                 del clients[sock]
                 continue
-                    
-             clients[sock] += data 
-             
-             while True:
-                print('executing the resp parser now') 
-                try:
-                   resp_args, leftover = resp_parser(clients[sock])
-                   print(resp_args)
-                   clients[sock] = leftover
-                
-                #call resp executor
-                   value_to_send = execute_commands.execute_commands(resp_args)
-                   sock.sendall(value_to_send)
-            
-                except ValueError:
-                  print(f"parsing Error")
-                  break
+             clients[sock] += data  
+             process_client_buffer(sock)
 
 try:
     connect_receive_and_process_data_from_client()
