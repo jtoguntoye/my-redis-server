@@ -1,7 +1,6 @@
 import socket
 import select
-import execute_commands
-import errno
+import execute_commands as execute_commands
 
 HOST = ''
 PORT = 6379
