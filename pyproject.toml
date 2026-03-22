@@ -1,0 +1,25 @@
+[project]
+name = "my-redis-server"
+version = "0.1.0"
+description = "A custom Redis server implementation in Python"
+authors = [{name = "Joel Oguntoye", email = "joeloguntoye@gmail.com"}]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+license-files = ["LICEN[CS]E*"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/jtoguntoye/my-redis-server.git"
+Issues = "https://github.com/jtoguntoye/my-redis-server/issues"
+
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+redis-server = "redis_server.__main__:main"

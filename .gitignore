@@ -1,3 +1,10 @@
 debug.log
 __pycache__/
 *.py[cod]
+
+# Python virtual environment
+.venv/
+venv/
+
+# Editable install metadata
+*.egg-info/
